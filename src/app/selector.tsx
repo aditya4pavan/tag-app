@@ -147,9 +147,9 @@ const Category = () => {
                 <Button size='small' disabled={isDisabled} onClick={handleSave} className='w-24' variant='outlined'>Save</Button>
             </div>
         </Dialog>
-        <div className='flex flex-row gap-5'>
+        <div className='flex flex-row gap-5 flex-wrap'>
             {data.map(e => {
-                return <Card className='min-w-[300px]' key={e._id}>
+                return <Card elevation={5} className='min-w-[300px]' key={e._id}>
                     <CardContent>
                         <div className='flex flex-row justify-between items-center'>
                             <Typography>{e.name}</Typography>

@@ -1,8 +1,10 @@
 import type { NextRequest } from "next/server";
 import Exercise from "../../../../schemas/exercise";
+import dbConnect from "../../../../lib/dbConnect";
 
 export async function GET(req: Request) {
     try {
+        await dbConnect();
         let documents = await Exercise.find();
         return Response.json({ success: true, data: documents }, { status: 200 })
     }
@@ -19,6 +21,7 @@ export async function POST(req: Request) {
             let docs = data?.name?.split(";").map((x: string) => {
                 return { name: x, description: 'NA' }
             })
+            await dbConnect()
             await Exercise.insertMany(docs);
             return Response.json({ success: true, data: docs }, { status: 200 });
         }
@@ -37,6 +40,7 @@ export async function PUT(req: Request) {
     try {
         let data = await req.json();
         const { _id, ...other } = data;
+        await dbConnect();
         await Exercise.updateOne({ _id: data._id }, other);
         let updatedDoc = await Exercise.findById(data._id)
         return Response.json(updatedDoc, { status: 200 })
