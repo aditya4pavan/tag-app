@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface ITemplate extends Document {
     name: string
     description: string
-    weeks: string[]
+    weeks: IWeek[]
 }
 
 interface IWeek extends Document {

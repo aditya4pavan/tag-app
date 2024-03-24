@@ -6,6 +6,8 @@ import Box from '@mui/material/Box';
 import { Tag } from '@/components/tabs/tag';
 import { Exercise } from '@/components/tabs/exercise';
 import { Category } from '@/components/tabs/category';
+import { Template } from '@/components/tabs/template';
+import { Circuits } from '@/components/tabs/circuits';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -55,6 +57,8 @@ export default function BasicTabs() {
                     <Tab label="Tags" {...a11yProps(0)} />
                     <Tab label="Exercises" {...a11yProps(1)} />
                     <Tab label="Categories" {...a11yProps(2)} />
+                    <Tab label="Templates" {...a11yProps(3)} />
+                    <Tab label="Circuits" {...a11yProps(4)} />
                 </Tabs>
             </Box>
             <CustomTabPanel value={value} index={0}>
@@ -65,6 +69,12 @@ export default function BasicTabs() {
             </CustomTabPanel>
             <CustomTabPanel value={value} index={2}>
                 <Category />
+            </CustomTabPanel>
+            <CustomTabPanel value={value} index={3}>
+                <Template />
+            </CustomTabPanel>
+            <CustomTabPanel value={value} index={4}>
+                <Circuits />
             </CustomTabPanel>
         </Box>
     );
