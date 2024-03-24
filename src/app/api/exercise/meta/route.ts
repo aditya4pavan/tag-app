@@ -1,11 +1,11 @@
 import type { NextRequest } from "next/server";
-import Exercise from "../../../../schemas/exercise";
-import dbConnect from "../../../../lib/dbConnect";
+import { ExerciseMeta } from "../../../../../schemas/exercise";
+import dbConnect from "../../../../../lib/dbConnect";
 
 export async function GET(req: Request) {
     try {
         await dbConnect();
-        let documents = await Exercise.find();
+        let documents = await ExerciseMeta.find();
         return Response.json({ success: true, data: documents }, { status: 200 })
     }
     catch (ex) {
@@ -13,22 +13,12 @@ export async function GET(req: Request) {
     }
 }
 
-
 export async function POST(req: Request) {
     try {
         let data = await req.json();
-        if (data?.name?.split(";").length > 1) {
-            let docs = data?.name?.split(";").map((x: string) => {
-                return { name: x, description: 'NA' }
-            })
-            await dbConnect()
-            await Exercise.insertMany(docs);
-            return Response.json({ success: true, data: docs }, { status: 200 });
-        }
-        else {
-            let doc = await Exercise.create(data);
-            return Response.json({ success: true, data: doc }, { status: 200 })
-        }
+        await dbConnect()
+        let doc = await ExerciseMeta.create(data);
+        return Response.json({ success: true, data: doc }, { status: 200 })
     }
     catch (ex) {
         console.log(ex);
@@ -41,7 +31,8 @@ export async function PUT(req: Request) {
         let data = await req.json();
         const { _id, ...other } = data;
         await dbConnect();
-        let updatedDoc = await Exercise.findByIdAndUpdate({ _id }, other);
+        let updatedDoc = await ExerciseMeta.findOneAndUpdate({ _id: data._id }, { $set: { meta: other.meta } }, { new: true });
+        // let updatedDoc = await ExerciseMeta.findById(data._id)
         return Response.json(updatedDoc, { status: 200 })
     }
     catch (ex) {
@@ -50,11 +41,10 @@ export async function PUT(req: Request) {
     }
 }
 
-
 export async function DELETE(req: NextRequest) {
     try {
         let id = req.nextUrl.searchParams.get('id') as string;
-        await Exercise.findByIdAndDelete(id);
+        await ExerciseMeta.findByIdAndDelete(id);
         return Response.json({ success: true }, { status: 200 })
     }
     catch (ex) {
