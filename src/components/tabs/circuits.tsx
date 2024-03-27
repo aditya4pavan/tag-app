@@ -81,6 +81,13 @@ export const Circuits = () => {
         });
     }
 
+    const handleDelete = (id: String) => {
+        axios.delete(`/api/circuit?id=${id}`).then(() => {
+            handleClear();
+            loadData();
+        });
+    }
+
     const handleClear = () => {
         setIsAdd(false);
         setName('');
@@ -192,6 +199,9 @@ export const Circuits = () => {
                             })}
                         </List>
                     </CardContent>
+                    <CardActions>
+                        <Button onClick={() => handleDelete(e._id)}>Remove</Button>
+                    </CardActions>
                 </Card>
             })}
         </div>
