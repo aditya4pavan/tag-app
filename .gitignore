@@ -130,3 +130,9 @@ dist
 .pnp.*
 
 .DS_Store
+
+certificates
+
+.amplify
+
+amplify_outputs.json
