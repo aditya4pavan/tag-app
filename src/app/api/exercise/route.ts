@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import Exercise from "../../../../schemas/exercise";
+import Exercise, { IExercise } from "../../../../schemas/exercise";
 import dbConnect from "../../../../lib/dbConnect";
 
 export async function GET(req: Request) {
@@ -50,6 +50,18 @@ export async function PUT(req: Request) {
     }
 }
 
+export async function PATCH(req: Request) {
+    try {
+        let data = await req.json();
+        await dbConnect();
+        let updatedDocs = await Exercise.updateMany({ _id: { $in: data.map((e: IExercise) => e._id) } }, { $set: { tags: [] } });
+        return Response.json(updatedDocs, { status: 200 })
+    }
+    catch (ex) {
+        console.log(ex);
+        return Response.json({ success: false, error: 'Server error' }, { status: 500 });
+    }
+}
 
 export async function DELETE(req: NextRequest) {
     try {

@@ -1,9 +1,7 @@
 import Tabs from "@/components/tabs";
 import dbConnect from "../../lib/dbConnect";
 
-
 export default async function Home() {
-
   await dbConnect();
 
   return (
