@@ -28,7 +28,7 @@ export const Tag = () => {
 
   const handleTag = async (tagId: string, exercise: IExercise) => {
     let newTags = exercise.tags.includes(tagId) ? exercise.tags.filter((e) => e !== tagId) : exercise.tags.concat(tagId);
-    let data = { ...exercise, tags: [] as string[] };
+    let data = { ...exercise, tags: newTags };
     let doc = await axios.put("/api/exercise", data);
     let newExercise = exercises.map((e) => {
       if (e._id === doc.data._id) return doc.data;
