@@ -39,3 +39,51 @@ exports.handler = async (event) => {
     throw err; // 🔒 blocks login
   }
 };
+
+const {
+  CognitoIdentityProviderClient,
+  AdminSetUserPasswordCommand
+} = require("@aws-sdk/client-cognito-identity-provider");
+
+const {
+  DynamoDBClient
+} = require("@aws-sdk/client-dynamodb");
+
+const {
+  DynamoDBDocumentClient,
+  UpdateCommand
+} = require("@aws-sdk/lib-dynamodb");
+
+const cognito = new CognitoIdentityProviderClient({});
+const ddbClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+
+const PASSWORD_AUDIT_TABLE = process.env.PASSWORD_AUDIT_TABLE; // set this in env vars
+
+exports.handler = async (event) => {
+  const { username, password } = event.arguments;
+
+  // Step 1: Admin reset password (force change at next login)
+  await cognito.send(new AdminSetUserPasswordCommand({
+    UserPoolId: process.env.USER_POOL_ID,
+    Username: username,
+    Password: password,
+    Permanent: false // Forces new password challenge on login
+  }));
+
+  // Step 2: Update audit table
+  const now = new Date().toISOString();
+
+  await ddbClient.send(new UpdateCommand({
+    TableName: PASSWORD_AUDIT_TABLE,
+    Key: { userName: username }, // assuming this is the partition key
+    UpdateExpression: `SET lastReset = :now, resetInitiatedByAdmin = :admin, passwordChanged = :changed`,
+    ExpressionAttributeValues: {
+      ':now': now,
+      ':admin': true,
+      ':changed': false
+    }
+  }));
+
+  return `Password reset initiated for ${username}`;
+};
+
