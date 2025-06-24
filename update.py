@@ -71,18 +71,46 @@ exports.handler = async (event) => {
   }));
 
   // Step 2: Update audit table
-  const now = new Date().toISOString();
-
-  await ddbClient.send(new UpdateCommand({
+// Step 2: Update audit table
+  const auditUpdate = new UpdateCommand({
     TableName: PASSWORD_AUDIT_TABLE,
-    Key: { userName: username }, // assuming this is the partition key
-    UpdateExpression: `SET lastReset = :now, resetInitiatedByAdmin = :admin, passwordChanged = :changed`,
+    Key: { userName: username },
+    UpdateExpression: `
+      SET lastReset = :now,
+          resetInitiatedByAdmin = :true,
+          passwordChanged = :false
+    `,
     ExpressionAttributeValues: {
       ':now': now,
-      ':admin': true,
-      ':changed': false
+      ':true': true,
+      ':false': false
+    },
+    ConditionExpression: 'attribute_exists(userName)' // fail if user doesn't exist
+  });
+
+  try {
+    await ddbDocClient.send(auditUpdate);
+  } catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      // Create a new entry if none exists
+      const auditInsert = new PutCommand({
+        TableName: PASSWORD_AUDIT_TABLE,
+        Item: {
+          id: username, // You can use username as id or generate UUID
+          userName: username,
+          lastReset: now,
+          resetInitiatedByAdmin: true,
+          passwordChanged: false,
+          passwordHashes: [] // or null if not required now
+        }
+      });
+      await ddbDocClient.send(auditInsert);
+    } else {
+      console.error('Error writing to audit table:', err);
+      throw err;
     }
-  }));
+  }
+
 
   return `Password reset initiated for ${username}`;
 };
