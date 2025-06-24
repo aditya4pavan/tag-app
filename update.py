@@ -115,3 +115,23 @@ exports.handler = async (event) => {
   return `Password reset initiated for ${username}`;
 };
 
+
+        //
+
+
+        try {
+    const { Item } = await ddbClient.send(new GetCommand({
+      TableName: PASSWORD_AUDIT_TABLE,
+      Key: { userName: username }
+    }));
+
+    if (Item && Item.lastReset) {
+      const lastResetDate = new Date(Item.lastReset);
+      const now = new Date();
+      const diffDays = Math.floor((now - lastResetDate) / (1000 * 60 * 60 * 24));
+
+      if (diffDays >= 180) {
+        // Send a custom message to frontend (via ID token or UI redirect)
+        event.response.autoForcePasswordChange = true;
+      }
+    }
