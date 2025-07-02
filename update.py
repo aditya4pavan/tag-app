@@ -98,7 +98,12 @@ exports.handler = async (event) => {
 
 
 
-const { DynamoDBClient, GetItemCommand, UpdateItemCommand } = require('@aws-sdk/client-dynamodb');
+const {
+  DynamoDBClient,
+  GetItemCommand,
+  UpdateItemCommand,
+  PutItemCommand
+} = require('@aws-sdk/client-dynamodb');
 
 const ddbClient = new DynamoDBClient({ region: process.env.REGION });
 
@@ -108,58 +113,72 @@ exports.handler = async (event) => {
   const now = Date.now();
 
   try {
-    // 1. Get audit record
+    // 1. Fetch audit record
     const { Item } = await ddbClient.send(new GetItemCommand({
       TableName: tableName,
       Key: { id: { S: username } }
     }));
 
     if (!Item) {
-      console.warn(`Audit record not found for ${username}, allowing login.`);
-      return event; // no record → allow login (or optionally deny)
+      // 2. If audit record doesn't exist, create one with failedAttempts = 1
+      await ddbClient.send(new PutItemCommand({
+        TableName: tableName,
+        Item: {
+          id: { S: username },
+          userName: { S: username },
+          failedAttempts: { N: '1' },
+          accountLocked: { BOOL: false },
+          resetInitiatedByAdmin: { BOOL: false },
+        }
+      }));
+
+      console.warn(`Audit record not found for ${username}, created new record with failedAttempts = 1.`);
+      return event;
     }
 
-    // 2. Extract values
+    // 3. Parse existing data
     const parseTime = (val) => val?.S ? new Date(val.S).getTime() : null;
     const issuedAt = parseTime(Item.issuedAt);
     const lastReset = parseTime(Item.lastReset);
-    const accountLocked = Item.accountLocked?.BOOL || false;
     const failedAttempts = Item.failedAttempts?.N ? parseInt(Item.failedAttempts.N) : 0;
+    const accountLocked = Item.accountLocked?.BOOL || false;
 
-    // 3. Business rules
+    // 4. Security checks
     if (accountLocked) {
-      throw new Error('Your account is locked due to multiple failed login attempts.');
+      throw new Error("Your account is locked due to multiple failed login attempts.");
     }
 
     if (issuedAt && !lastReset && now - issuedAt > 24 * 60 * 60 * 1000) {
-      throw new Error('Temporary password expired. Please contact support.');
+      throw new Error("Temporary password has expired. Please contact your administrator.");
     }
 
     if (lastReset && now - lastReset > 180 * 24 * 60 * 60 * 1000) {
-      throw new Error('Your password has expired. Please reset your password.');
+      throw new Error("Your password has expired. Please reset your password.");
     }
 
-    // 4. Increment failed attempts
-    const newAttempts = failedAttempts + 1;
-    const lockUser = newAttempts >= 6;
+    // 5. Increment failedAttempts and lock if >= 6
+    const newFailedAttempts = failedAttempts + 1;
+    const shouldLock = newFailedAttempts >= 6;
 
     await ddbClient.send(new UpdateItemCommand({
       TableName: tableName,
       Key: { id: { S: username } },
       UpdateExpression: `
         SET failedAttempts = :fa,
-            accountLocked = :al
+            accountLocked = :locked
       `,
       ExpressionAttributeValues: {
-        ':fa': { N: newAttempts.toString() },
-        ':al': { BOOL: lockUser }
+        ':fa': { N: newFailedAttempts.toString() },
+        ':locked': { BOOL: shouldLock }
       }
     }));
 
+    console.log(`Failed attempt ${newFailedAttempts} for ${username}. AccountLocked: ${shouldLock}`);
     return event;
 
   } catch (error) {
-    console.error(`Pre-auth failure for ${username}:`, error.message);
+    console.error(`Pre-auth error for ${username}:`, error.message);
     throw error;
   }
 };
+
