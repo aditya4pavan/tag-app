@@ -234,3 +234,55 @@ const updateUserPasswordAudit = async (authUser) => {
   }
 };
 
+
+
+
+import { DynamoDBClient, QueryCommand } from "@aws-sdk/client-dynamodb";
+import crypto from "crypto";
+
+const ddb = new DynamoDBClient({});
+const TABLE_NAME = process.env.AUDIT_TABLE || "UserPasswordAudit";
+
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+}
+
+export const handler = async (event) => {
+  const { userName, newPassword } = event.arguments;
+
+  const twoYearsAgo = new Date();
+  twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+  const twoYearsAgoISO = twoYearsAgo.toISOString();
+
+  try {
+    const result = await ddb.send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "userName = :u",
+        ExpressionAttributeValues: {
+          ":u": { S: userName }
+        }
+      })
+    );
+
+    for (const item of result.Items || []) {
+      const changedAt = item.changedAt?.S;
+      const storedSalt = item.salt?.S;
+      const storedHash = item.passwordHash?.S;
+
+      if (!changedAt || !storedSalt || !storedHash) continue;
+      if (changedAt < twoYearsAgoISO) continue;
+
+      const newHash = hashPassword(newPassword, storedSalt);
+
+      if (newHash === storedHash) {
+        return true; // Password was used before
+      }
+    }
+
+    return false; // No match found
+  } catch (err) {
+    console.error("Error in checkPasswordReuse Lambda:", err);
+    throw new Error("Failed to check password reuse");
+  }
+};
