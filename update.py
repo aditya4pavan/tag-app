@@ -287,3 +287,36 @@ export const handler = async (event) => {
     throw new Error("Internal error");
   }
 };
+
+
+const crypto = require('crypto'); // Ensure this is at the top
+
+const currentPasswordHash = crypto.createHash('sha256').update(password).digest('hex');
+const nowISO = new Date().toISOString();
+const now = new Date();
+const twoYearsAgo = new Date(now.setFullYear(now.getFullYear() - 2));
+
+// Get existing hashes
+const existingHashes = Item.passwordHashes || [];
+
+// Check if this hash was used in the last 2 years
+const usedRecently = existingHashes.some(entry => {
+  const usedAt = new Date(entry.timestamp);
+  return entry.hash === currentPasswordHash && usedAt >= twoYearsAgo;
+});
+
+// Add if:
+if (!usedRecently) {
+  existingHashes.push({ hash: currentPasswordHash, timestamp: nowISO });
+
+  updateExpr.push('passwordHashes = :ph');
+  exprVals[':ph'] = {
+    L: existingHashes.map(entry => ({
+      M: {
+        hash: { S: entry.hash },
+        timestamp: { S: entry.timestamp }
+      }
+    }))
+  };
+}
+
