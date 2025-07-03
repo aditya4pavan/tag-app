@@ -182,3 +182,55 @@ exports.handler = async (event) => {
   }
 };
 
+
+const updateUserPasswordAudit = async (authUser) => {
+  const {
+    DynamoDBClient,
+    GetItemCommand,
+    UpdateItemCommand
+  } = require('@aws-sdk/client-dynamodb');
+
+  const ddbClient = new DynamoDBClient({ region: process.env.REGION });
+  const tableName = process.env.API_LVAR_USERPASSWORDAUDITTABLE_NAME;
+  const username = authUser.username;
+  const now = new Date().toISOString();
+
+  try {
+    const { Item } = await ddbClient.send(new GetItemCommand({
+      TableName: tableName,
+      Key: { id: { S: username } }
+    }));
+
+    if (!Item) {
+      console.warn(`No UserPasswordAudit record found for ${username}`);
+      return;
+    }
+
+    const issuedAt = Item.issuedAt?.S;
+    const lastReset = Item.lastReset?.S;
+    const isFirstLogin = issuedAt && !lastReset;
+
+    const updateExpr = ['SET failedAttempts = :zero'];
+    const exprVals = {
+      ':zero': { N: '0' }
+    };
+
+    if (isFirstLogin) {
+      updateExpr.push('lastReset = :ts', 'userChanged = :uc');
+      exprVals[':ts'] = { S: now };
+      exprVals[':uc'] = { BOOL: true };
+    }
+
+    await ddbClient.send(new UpdateItemCommand({
+      TableName: tableName,
+      Key: { id: { S: username } },
+      UpdateExpression: updateExpr.join(', '),
+      ExpressionAttributeValues: exprVals
+    }));
+
+    console.log(`Audit updated for ${username}: failedAttempts reset${isFirstLogin ? ', first login completed' : ''}`);
+  } catch (error) {
+    console.error('Failed to update UserPasswordAudit:', error.message);
+  }
+};
+
