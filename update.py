@@ -237,14 +237,12 @@ const updateUserPasswordAudit = async (authUser) => {
 
 
 
-import { DynamoDBClient, QueryCommand } from "@aws-sdk/client-dynamodb";
-import crypto from "crypto";
 
-const ddb = new DynamoDBClient({});
-const TABLE_NAME = process.env.AUDIT_TABLE || "UserPasswordAudit";
 
-function hashPassword(password, salt) {
-  return crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+function hashPassword(password) {
+  return crypto
+    .pbkdf2Sync(password, 'fixed_salt', 100000, 64, 'sha512')
+    .toString('hex');
 }
 
 export const handler = async (event) => {
@@ -256,33 +254,36 @@ export const handler = async (event) => {
 
   try {
     const result = await ddb.send(
-      new QueryCommand({
+      new GetItemCommand({
         TableName: TABLE_NAME,
-        KeyConditionExpression: "userName = :u",
-        ExpressionAttributeValues: {
-          ":u": { S: userName }
+        Key: {
+          userName: { S: userName }
         }
       })
     );
 
-    for (const item of result.Items || []) {
-      const changedAt = item.changedAt?.S;
-      const storedSalt = item.salt?.S;
-      const storedHash = item.passwordHash?.S;
+    const record = result.Item;
+    if (!record || !record.passwordHashes?.L) {
+      return false;
+    }
 
-      if (!changedAt || !storedSalt || !storedHash) continue;
-      if (changedAt < twoYearsAgoISO) continue;
+    const newHash = hashPassword(newPassword);
 
-      const newHash = hashPassword(newPassword, storedSalt);
+    for (const entry of record.passwordHashes.L) {
+      const storedHash = entry.M?.hash?.S;
+      const timestamp = entry.M?.timestamp?.S;
+
+      if (!storedHash || !timestamp) continue;
+      if (timestamp < twoYearsAgoISO) continue;
 
       if (newHash === storedHash) {
-        return true; // Password was used before
+        return true; // Reused
       }
     }
 
-    return false; // No match found
+    return false;
   } catch (err) {
-    console.error("Error in checkPasswordReuse Lambda:", err);
-    throw new Error("Failed to check password reuse");
+    console.error("Error checking password reuse:", err);
+    throw new Error("Internal error");
   }
 };
