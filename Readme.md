@@ -1,0 +1,7 @@
+SPIKE: Investigate logging of Auth traces when using Amplify + Cognito login
+
+We need to figure out how to capture and log authentication traces when using AWS Amplify and Amazon Cognito for user login. Currently, we don’t have visibility into the detailed flow of authentication requests/responses (e.g., tokens, login success/failures, retries, session refresh). This SPIKE should explore options for enabling trace logging in a secure and scalable way.
+                                                                                                                                                                                                                                                                                                                                
+SPIKE: Research ways to improve background upload performance for Payment & Funding items
+                                                                                                                                                                                                                                                                                                                                
+Currently, uploading 5,000 Payment or Funding items takes 3–5 minutes when processed in the background. This SPIKE is to research and evaluate potential optimizations to reduce the upload time. The goal is to identify bottlenecks in the current process and propose improvements that can make the upload more efficient while maintaining reliability and data integrity.
